@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#155eef"><meta name="description" content="সহজ বাংলা ডেটা এন্ট্রি অ্যাপ">
+<link rel="manifest" href="manifest.json">
+<title>সহজ Data Entry</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Noto Sans Bengali",sans-serif;color:#182230;background:#f4f7fb}
+*{box-sizing:border-box}body{margin:0}header{background:#155eef;color:white;padding:22px 16px 18px;border-radius:0 0 22px 22px}
+h1{font-size:23px;margin:0 0 5px}header p{margin:0;opacity:.9;font-size:14px}
+main{max-width:760px;margin:auto;padding:14px;display:grid;gap:14px}
+.card{background:white;border:1px solid #e4eaf2;border-radius:16px;padding:16px;box-shadow:0 3px 12px #172b4d0a}
+h2{font-size:18px;margin:0 0 12px}.grid{display:grid;gap:11px}
+label{font-size:14px;font-weight:650;display:grid;gap:6px}
+input,textarea{font:inherit;width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#182230}
+textarea{min-height:86px;resize:vertical}
+button,.filebtn{font:inherit;font-weight:650;border:0;border-radius:10px;padding:11px 14px;cursor:pointer;text-align:center}
+.primary{background:#155eef;color:white}.secondary{background:#eaf1ff;color:#1747a6}.danger{background:#fff0f0;color:#b42318}.muted{color:#667085;font-size:13px}
+.actions{display:flex;flex-wrap:wrap;gap:8px}.actions button,.filebtn{flex:1}
+.searchrow{display:flex;gap:8px}.searchrow input{flex:1;min-width:0}
+.entry{border:1px solid #e4eaf2;border-radius:12px;padding:12px;margin-top:10px}
+.entrytop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.entry h3{font-size:16px;margin:0 0 4px;overflow-wrap:anywhere}.entry p{margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.entry small{color:#667085}.entry .actions{margin-top:10px}.empty{text-align:center;color:#667085;padding:22px 8px}
+.stats{display:flex;justify-content:space-between;gap:10px;color:#475467;font-size:14px}
+.hidden{display:none!important}
+footer{text-align:center;color:#667085;font-size:12px;padding:4px 14px 22px}
+</style>
+</head>
+<body>
+<header><h1>📝 সহজ Data Entry</h1><p>তথ্য যোগ করুন, খুঁজুন, সম্পাদনা করুন ও ব্যাকআপ রাখুন</p></header>
+<main>
+<section class="card">
+<h2 id="formTitle">নতুন তথ্য যোগ করুন</h2>
+<form id="entryForm" class="grid">
+<input id="entryId" type="hidden">
+<label>নাম / শিরোনাম *<input id="title" required maxlength="160" placeholder="যেমন: রহিম / অর্ডার ১০১"></label>
+<label>তারিখ<input id="date" type="date"></label>
+<label>মোবাইল / রেফারেন্স নম্বর<input id="reference" maxlength="100" placeholder="ঐচ্ছিক"></label>
+<label>বিবরণ<textarea id="details" maxlength="5000" placeholder="প্রয়োজনীয় তথ্য লিখুন..."></textarea></label>
+<div class="actions"><button class="primary" type="submit" id="saveBtn">তথ্য সংরক্ষণ</button><button class="secondary" type="button" id="resetBtn">ফর্ম পরিষ্কার</button></div>
+<p class="muted">* চিহ্নিত ঘরটি অবশ্যই পূরণ করতে হবে। তথ্য এই ব্রাউজারের ফোনে সংরক্ষিত থাকবে।</p>
+</form>
+</section>
+<section class="card">
+<h2>তথ্য তালিকা</h2>
+<div class="searchrow"><input id="search" placeholder="নাম, তারিখ, রেফারেন্স বা বিবরণ খুঁজুন…"><button class="secondary" id="clearSearch">মুছুন</button></div>
+<div class="stats" style="margin-top:12px"><span id="count">মোট ০টি তথ্য</span><span id="storageStatus">ফোনে সংরক্ষিত</span></div>
+<div id="entries"></div>
+</section>
+<section class="card">
+<h2>Backup, Restore ও Excel</h2>
+<div class="grid">
+<div class="actions"><button class="secondary" id="exportCsv">Excel/CSV Export</button><button class="secondary" id="backup">Backup ডাউনলোড</button></div>
+<label class="filebtn secondary">Backup Restore করুন (JSON)<input id="restoreFile" type="file" accept=".json,application/json" class="hidden"></label>
+<button class="danger" id="deleteAll">সব তথ্য মুছুন</button>
+<p class="muted">CSV ফাইল Excel-এ খোলা যাবে। Backup JSON ফাইল নিরাপদে রেখে দিন। Restore করলে বর্তমান তথ্যের সঙ্গে মিলিয়ে যোগ হবে; একই ID থাকলে পুরোনোটি আপডেট হবে।</p>
+</div>
+</section>
+</main>
+<footer>আপনার তথ্য এই ডিভাইসের ব্রাউজারে থাকে। ব্রাউজারের ডেটা মুছে ফেললে তথ্য হারাতে পারে—নিয়মিত Backup নিন।</footer>
+<script>
+const $=id=>document.getElementById(id);
+const KEY='simpleDataEntryRecords_v1';
+let records=[];
+function load(){try{const x=JSON.parse(localStorage.getItem(KEY)||'[]');records=Array.isArray(x)?x:[]}catch{records=[]}}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(records));$('storageStatus').textContent='ফোনে সংরক্ষিত'}catch{$('storageStatus').textContent='সংরক্ষণে সমস্যা';alert('ফোনে জায়গা নেই বা ব্রাউজার সংরক্ষণ বন্ধ করেছে। Backup নিন।')}}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function resetForm(){ $('entryForm').reset();$('entryId').value='';$('date').value=new Date().toLocaleDateString('en-CA');$('formTitle').textContent='নতুন তথ্য যোগ করুন';$('saveBtn').textContent='তথ্য সংরক্ষণ'}
+function render(){
+ const q=$('search').value.trim().toLocaleLowerCase();
+ const filtered=records.filter(r=>[r.title,r.date,r.reference,r.details].some(v=>String(v||'').toLocaleLowerCase().includes(q))).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+ $('count').textContent=`মোট ${records.length}টি তথ্য · দেখাচ্ছে ${filtered.length}টি`;
+ if(!filtered.length){$('entries').innerHTML='<div class="empty">কোনো তথ্য পাওয়া যায়নি।<br>উপরে ফর্ম থেকে নতুন তথ্য যোগ করুন।</div>';return}
+ $('entries').innerHTML=filtered.map(r=>`<article class="entry"><div class="entrytop"><div><h3>${esc(r.title)}</h3><small>${esc(r.date||'তারিখ নেই')}${r.reference?' · '+esc(r.reference):''}</small></div></div>${r.details?`<p>${esc(r.details)}</p>`:''}<div class="actions"><button class="secondary" data-edit="${esc(r.id)}">Edit</button><button class="danger" data-delete="${esc(r.id)}">Delete</button></div></article>`).join('');
+}
+$('entryForm').addEventListener('submit',e=>{
+ e.preventDefault();const title=$('title').value.trim();if(!title)return;
+ const id=$('entryId').value;const old=records.find(r=>r.id===id);
+ const item={id:id||crypto.randomUUID?.()||String(Date.now())+Math.random().toString(16).slice(2),title,date:$('date').value,reference:$('reference').value.trim(),details:$('details').value.trim(),createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
+ if(old)records=records.map(r=>r.id===id?item:r);else records.push(item);
+ persist();render();resetForm();alert(old?'তথ্য আপডেট হয়েছে।':'তথ্য সংরক্ষণ হয়েছে।');
+});
+$('resetBtn').onclick=resetForm;
+$('search').addEventListener('input',render);
+$('clearSearch').onclick=()=>{$('search').value='';render()};
+$('entries').addEventListener('click',e=>{
+ const edit=e.target.closest('[data-edit]')?.dataset.edit,del=e.target.closest('[data-delete]')?.dataset.delete;
+ if(edit){const r=records.find(x=>x.id===edit);if(!r)return;$('entryId').value=r.id;$('title').value=r.title;$('date').value=r.date||'';$('reference').value=r.reference||'';$('details').value=r.details||'';$('formTitle').textContent='তথ্য সম্পাদনা করুন';$('saveBtn').textContent='পরিবর্তন সংরক্ষণ';window.scrollTo({top:0,behavior:'smooth'})}
+ if(del){const r=records.find(x=>x.id===del);if(r&&confirm(`“${r.title}” তথ্যটি মুছে ফেলবেন?`)){records=records.filter(x=>x.id!==del);persist();render();if($('entryId').value===del)resetForm()}}
+});
+function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+$('exportCsv').onclick=()=>{
+ const cols=['id','title','date','reference','details','createdAt','updatedAt'];
+ const csv='\ufeff'+[cols,...records.map(r=>cols.map(k=>r[k]??''))].map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+ download(new Blob([csv],{type:'text/csv;charset=utf-8;'}),'data-entry-'+new Date().toISOString().slice(0,10)+'.csv');
+};
+$('backup').onclick=()=>download(new Blob([JSON.stringify({app:'Simple Data Entry',version:1,exportedAt:new Date().toISOString(),records},null,2)],{type:'application/json'}),'data-entry-backup-'+new Date().toISOString().slice(0,10)+'.json');
+$('restoreFile').onchange=async e=>{
+ const file=e.target.files[0];if(!file)return;
+ try{const obj=JSON.parse(await file.text());const incoming=Array.isArray(obj)?obj:obj.records;if(!Array.isArray(incoming))throw Error('invalid');
+ if(!confirm(`${incoming.length}টি রেকর্ড Restore করবেন? একই ID থাকলে আপডেট হবে।`))return;
+ const map=new Map(records.map(r=>[String(r.id),r]));
+ for(const r of incoming){if(!r||!r.title)continue;const id=String(r.id||Date.now()+Math.random());map.set(id,{id,title:String(r.title),date:String(r.date||''),reference:String(r.reference||''),details:String(r.details||''),createdAt:r.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()})}
+ records=[...map.values()];persist();render();alert('Backup Restore সম্পন্ন হয়েছে।');
+ }catch{alert('এই Backup ফাইলটি পড়া যাচ্ছে না। সঠিক JSON Backup বেছে নিন।')}finally{e.target.value=''}
+};
+$('deleteAll').onclick=()=>{if(records.length&&confirm('সত্যিই সব তথ্য মুছবেন? আগে Backup নিয়ে নিন।')){records=[];persist();render();resetForm()}};
+load();resetForm();render();
+if('serviceWorker' in navigator && location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+</script>
+</body></html>
+{
+"name":"সহজ Data Entry","short_name":"Data Entry","description":"সহজ বাংলা ডেটা এন্ট্রি অ্যাপ","start_url":"./index.html","scope":"./","display":"standalone","background_color":"#f4f7fb","theme_color":"#155eef","lang":"bn"
+}
+const CACHE='simple-data-entry-v1';const ASSETS=['./','./index.html','./manifest.json'];self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))));self.addEventListener('fetch',e=>{if(e.request.method==='GET')e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>caches.match('./index.html'))))});
